@@ -10,18 +10,18 @@ namespace AspNetCoreFirstApp
             var builder = WebApplication.CreateBuilder(args);
             var app = builder.Build();
 
-            //app.MapGet("/", () => DateTime.UtcNow.ToString() + " Дата на сегодня");
+            //app.MapGet("/", () => DateTime.UtcNow.ToString() + " Р”Р°С‚Р° РЅР° СЃРµРіРѕРґРЅСЏ");
             //app.MapGet("/new_year", () => Math.Round((DateTime.Parse($"01.01.{DateTime.Now.Year + 1}") - DateTime.Now)
-            //.TotalDays).ToString() + " дней осталось до Нового года");
+            //.TotalDays).ToString() + " РґРЅРµР№ РѕСЃС‚Р°Р»РѕСЃСЊ РґРѕ РќРѕРІРѕРіРѕ РіРѕРґР°");
 
             //1
             app.MapGet("/customs_duty", (double price) =>
             {
-                string message = "Итоговая стоимость посылки с пошлиной: ";
+                string message = "РС‚РѕРіРѕРІР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ РїРѕСЃС‹Р»РєРё СЃ РїРѕС€Р»РёРЅРѕР№: ";
                 int limit = 200;
                 if (price <= limit)
-                    return message + price.ToString() + " €";
-                return message + (price += price * 0.15) + " €";
+                    return message + price.ToString() + " РµРІСЂРѕ";
+                return message + (price += price * 0.15) + " РµРІСЂРѕ";
             });
 
             //2
