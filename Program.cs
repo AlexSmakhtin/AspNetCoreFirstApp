@@ -10,7 +10,7 @@ namespace AspNetCoreFirstApp
             var builder = WebApplication.CreateBuilder(args);
             var app = builder.Build();
 
-            //app.MapGet("/", () => DateTime.UtcNow.ToString() + " „ата на сегодня");
+            //app.MapGet("/", () => DateTime.UtcNow.ToString() + " Дата на сегодня");
             //app.MapGet("/new_year", () => Math.Round((DateTime.Parse($"01.01.{DateTime.Now.Year + 1}") - DateTime.Now)
             //.TotalDays).ToString() + " дней осталось до Нового года");
 
