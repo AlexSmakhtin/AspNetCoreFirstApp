@@ -7,15 +7,15 @@
         public Item(string name, decimal cost)
         {
             if (string.IsNullOrEmpty(name))
-                Name = string.Empty;
+                throw new ArgumentNullException(nameof(name));
             if (cost <= 0)
-                cost = 0;
+                throw new ArgumentNullException(nameof(cost));
             Name = name;
             Cost = cost;
         }
         public override string ToString()
         {
-            return $"{Name} - {Cost}";
+            return $"{Name} - {(DateTime.Now.DayOfWeek == DayOfWeek.Monday ? Cost - Cost * 0.3m : Cost)}";
         }
     }
 }
