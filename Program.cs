@@ -25,6 +25,10 @@ namespace AspNetCoreFirstApp
             items.Add(new Item("Item 8", 8.99m));
 
             var builder = WebApplication.CreateBuilder(args);
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+
             var app = builder.Build();
 
             //1.1 add item
