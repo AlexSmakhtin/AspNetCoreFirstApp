@@ -18,19 +18,25 @@ namespace AspNetCoreFirstApp
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddControllers();
+            builder.Configuration.AddEnvironmentVariables().Build();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddSingleton<IMemoryCheck, MemoryChecker>();
-            builder.Services.AddTransient<IEmailSender, BegetSMTPEmailSender>(
+            builder.Services.AddSingleton<IEmailSender, BegetSMTPEmailSender>(
                 serviceProvider => new BegetSMTPEmailSender(LoggerFactory.Create(builder =>
                 {
-                    builder.AddSimpleConsole(i => i.ColorBehavior = Microsoft.Extensions.Logging.Console.LoggerColorBehavior.Enabled);
+                    builder.AddSimpleConsole(i =>
+                        i.ColorBehavior = Microsoft.Extensions.Logging.Console.LoggerColorBehavior.Enabled
+                    );
                 })
                 .CreateLogger("Program")));
             builder.Services.AddHostedService(serviceProvider =>
-                new BackgroundEmailMemoryService(serviceProvider.GetService<IEmailSender>(),
-                    TimeSpan.FromMinutes(60),
-                    serviceProvider.GetService<IMemoryCheck>()));
+                new BackgroundEmailMemoryService(
+                    serviceProvider.GetService<IEmailSender>() ?? throw new ArgumentNullException("emailSender"),
+                TimeSpan.FromSeconds(10),
+                serviceProvider.GetService<IMemoryCheck>() ?? throw new ArgumentNullException("memoryCheck"),
+                builder.Configuration)
+            );
             var app = builder.Build();
             app.UseSwagger();
             app.UseSwaggerUI(options =>
@@ -38,6 +44,39 @@ namespace AspNetCoreFirstApp
                 options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
                 options.RoutePrefix = string.Empty;
             });
+            app.MapGet("/sendemails",
+                async (
+                    IEmailSender emailSender,
+                    ILogger<Program> logger,
+                    IConfiguration configuration,
+                    CancellationToken token) =>
+                    {
+                        if (emailSender.IsConnected == false)
+                            await emailSender.ConnectAsync(
+                                configuration["BegetSMTPLog_inData:Host"] ?? throw new ArgumentException("Host"),
+                                int.Parse(configuration["BegetSMTPLog_inData:Port"] ?? throw new ArgumentException("Port")),
+                                false,
+                                token);
+                        if (emailSender.IsAuthenticated == false)
+                            await emailSender.AuthenticateAsync(
+                                configuration["BegetSMTPLog_inData:Login"] ?? throw new ArgumentException("Login"),
+                                configuration["BegetSMTPLog_inData:Password"] ?? throw new ArgumentException("Password"),
+                                token);
+                        for (int i = 0; i < 10; i++)
+                        {
+                            logger.LogInformation($"Sending {i + 1} email...");
+                            var stopwatch = Stopwatch.StartNew();
+                            await emailSender.SendEmailAsync(
+                                "Aleksey S.",
+                                "asp2022pd011@rodion-m.ru",
+                                "Alex", "kokotiv3@ya.ru",
+                                "Memory",
+                                "Sent",
+                                token);
+                            stopwatch.Stop();
+                            logger.LogInformation($"Email {i + 1} sent in {stopwatch.ElapsedMilliseconds} ms");
+                        }
+                    });
             app.Run();
         }
     }

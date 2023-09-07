@@ -1,10 +1,28 @@
-﻿namespace AspNetCoreFirstApp
+﻿using MimeKit.Encodings;
+
+namespace AspNetCoreFirstApp
 {
-    public interface IEmailSender
+    public interface IEmailSender : IAsyncDisposable
     {
-        public Task SendEmailAsync(string fromName, string fromEmail,
+        public bool IsConnected { get; }
+        public bool IsAuthenticated { get; }
+        public Task SendEmailAsync(
+            string fromName,
+            string fromEmail,
+            string toName,
+            string toEmail,
+            string subject,
+            string body,
+            CancellationToken token);
+        public Task ConnectAsync(
+            string host,
+            int port,
+            bool useSsl,
+            CancellationToken token);
+        public Task AuthenticateAsync(
+            string email,
             string password,
-            string toName, string toEmail,
-            string subject, string body, bool useSsl, CancellationToken token);
+            CancellationToken token);
+        public Task DisconnectAsync(bool quit);
     }
 }
