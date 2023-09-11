@@ -2,10 +2,8 @@
 
 namespace AspNetCoreFirstApp
 {
-    public interface IEmailSender : IAsyncDisposable
+    public interface IEmailSender
     {
-        public bool IsConnected { get; }
-        public bool IsAuthenticated { get; }
         public Task SendEmailAsync(
             string fromName,
             string fromEmail,
@@ -14,15 +12,5 @@ namespace AspNetCoreFirstApp
             string subject,
             string body,
             CancellationToken token);
-        public Task ConnectAsync(
-            string host,
-            int port,
-            bool useSsl,
-            CancellationToken token);
-        public Task AuthenticateAsync(
-            string email,
-            string password,
-            CancellationToken token);
-        public Task DisconnectAsync(bool quit);
     }
 }
