@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 #pragma warning disable CS8618
 
@@ -9,7 +10,7 @@ namespace AspNetCoreFirstApp
     {
         [Required]
         public string Host { get; set; }
-        [Required]
+        [Range(25, 25)]
         public int Port { get; set; }
         [EmailAddress]
         public string Login { get; set; }
@@ -17,7 +18,7 @@ namespace AspNetCoreFirstApp
         public string Password { get; set; }
         [Required]
         public bool UseSsl { get; set; }
-        [Required]
+        [StringLength(254, MinimumLength = 1)]
         public string EmailText { get; set; }
 
     }
