@@ -11,6 +11,7 @@ namespace AspNetCoreFirstApp
             string toEmail,
             string subject,
             string body,
+            int retryCount,
             CancellationToken token);
     }
 }
