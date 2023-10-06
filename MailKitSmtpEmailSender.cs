@@ -1,21 +1,19 @@
-﻿using Microsoft.Extensions.Options;
-using MimeKit;
+﻿using MimeKit;
 
 namespace AspNetCoreFirstApp
 {
     public class MailKitSmtpEmailSender : IEmailSender, IAsyncDisposable, IDisposable
     {
-        private readonly SemaphoreSlim semaphoreSlim = new(1, 1);
-        private readonly SmtpConfig _options;
+        private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
+        private readonly IConfiguration _config;
         private readonly MailKit.Net.Smtp.SmtpClient _smtpClient;
         private readonly ILogger<MailKitSmtpEmailSender> _logger;
         private bool disposed;
         public MailKitSmtpEmailSender(
-            IOptionsSnapshot<SmtpConfig> options,
+            IConfiguration config,
             ILogger<MailKitSmtpEmailSender> logger)
         {
-            ArgumentNullException.ThrowIfNull(options);
-            _options = options.Value;
+            _config = config;
             disposed = false;
             _smtpClient = new MailKit.Net.Smtp.SmtpClient();
             _logger = logger;
@@ -23,13 +21,13 @@ namespace AspNetCoreFirstApp
         }
         public async Task DisconnectAsync(bool quit)
         {
-            await semaphoreSlim.WaitAsync();
+            await _semaphoreSlim.WaitAsync();
             if (_smtpClient.IsConnected == true)
             {
                 await _smtpClient.DisconnectAsync(quit);
                 _logger.LogInformation("_smtpClient disconnected");
             }
-            semaphoreSlim.Release();
+            _semaphoreSlim.Release();
         }
         public async ValueTask DisposeAsync()
         {
@@ -37,7 +35,7 @@ namespace AspNetCoreFirstApp
         }
         private async Task Dispose(bool disposing)
         {
-            await semaphoreSlim.WaitAsync();
+            await _semaphoreSlim.WaitAsync();
             if (disposed == true)
                 return;
             if (disposing)
@@ -49,7 +47,7 @@ namespace AspNetCoreFirstApp
                 _smtpClient.Dispose();
             }
             disposed = true;
-            semaphoreSlim.Release();
+            _semaphoreSlim.Release();
             _logger.LogInformation("MailKitSmtpEmailSender disposed");
         }
 
@@ -60,74 +58,60 @@ namespace AspNetCoreFirstApp
             string toEmail,
             string subject,
             string body,
-            int retryCount,
             CancellationToken token)
         {
-            if (retryCount > 0)
-                try
+            try
+            {
+                await EnsureConnectedAndAuthenticated(token);
+                var mimeMessage = new MimeMessage();
+                mimeMessage.From.Add(new MailboxAddress(fromName, fromEmail));
+                mimeMessage.To.Add(new MailboxAddress(toName, toEmail));
+                mimeMessage.Subject = subject;
+                mimeMessage.Body = new TextPart(MimeKit.Text.TextFormat.Plain)
                 {
-                    await EnsureConnectedAndAuthenticated(token);
-                    var mimeMessage = new MimeMessage();
-                    mimeMessage.From.Add(new MailboxAddress(fromName, fromEmail));
-                    mimeMessage.To.Add(new MailboxAddress(toName, toEmail));
-                    mimeMessage.Subject = subject;
-                    mimeMessage.Body = new TextPart(MimeKit.Text.TextFormat.Plain)
-                    {
-                        Text = body
-                    };
-                    await _smtpClient.SendAsync(mimeMessage, token);
-                    _logger.LogInformation("Message sent to {@To}", mimeMessage.To.First().Name);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error");
-                    await SendEmailAsync(
-                        fromName,
-                        fromEmail,
-                        toName,
-                        toEmail,
-                        subject,
-                        body,
-                        --retryCount,
-                        token);
-                }
-            else
-                throw new Exception();
+                    Text = body
+                };
+                var response = await _smtpClient.SendAsync(mimeMessage, token);
+                _logger.LogInformation("Smtp server response: {@response}", response);
+                _logger.LogInformation("Message sent to {@To}", mimeMessage.To.First().Name);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+
         }
 
         private async Task EnsureConnectedAndAuthenticated(CancellationToken token)
         {
-            await semaphoreSlim.WaitAsync(token);
             try
             {
-
+                await _semaphoreSlim.WaitAsync(token);
                 if (!_smtpClient.IsConnected)
                 {
                     await _smtpClient.ConnectAsync(
-                        _options.Host,
-                        _options.Port,
-                        _options.UseSsl,
+                        _config.GetSection("SmtpConfig").GetValue<string>("Host"),
+                        _config.GetSection("SmtpConfig").GetValue<int>("Port"),
+                        _config.GetSection("SmtpConfig").GetValue<bool>("UseSsl"),
                         cancellationToken: token);
                     _logger.LogInformation("_smtpClient connected");
                 }
                 if (!_smtpClient.IsAuthenticated)
                 {
                     await _smtpClient.AuthenticateAsync(
-                        _options.Login,
-                        _options.Password,
+                        _config.GetSection("SmtpConfig").GetValue<string>("Login"),
+                        _config.GetSection("SmtpConfig").GetValue<string>("Password"),
                         cancellationToken: token);
                     _logger.LogInformation("_smtpClient authenticated");
                 }
-
             }
             catch (Exception)
             {
-                _logger.LogError("Failed to connect and to authenticate");
                 throw;
             }
             finally
             {
-                semaphoreSlim.Release();
+                _semaphoreSlim.Release();
             }
         }
 

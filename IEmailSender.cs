@@ -1,5 +1,4 @@
-﻿using MimeKit.Encodings;
-
+﻿
 namespace AspNetCoreFirstApp
 {
     public interface IEmailSender
@@ -11,7 +10,6 @@ namespace AspNetCoreFirstApp
             string toEmail,
             string subject,
             string body,
-            int retryCount,
             CancellationToken token);
     }
 }

@@ -1,7 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System.Diagnostics;
 using Serilog;
+using System.Text;
 
 namespace AspNetCoreFirstApp
 {
@@ -16,14 +14,15 @@ namespace AspNetCoreFirstApp
             try
             {
                 var builder = WebApplication.CreateBuilder(args);
-                builder.Services.AddOptions<SmtpConfig>()
-                    .BindConfiguration("SmtpConfig")
-                    .ValidateDataAnnotations()
-                    .ValidateOnStart();
                 builder.Host.UseSerilog((ctx, conf) =>
                 {
                     conf.MinimumLevel.Information()
                     .WriteTo.Console()
+                    .MinimumLevel.Information()
+                    .WriteTo.File(
+                        "Logs/log.txt",
+                        rollingInterval: RollingInterval.Day,
+                        encoding: Encoding.UTF8)
                     .MinimumLevel.Information();
                 });
                 builder.Services.AddControllers();
@@ -40,27 +39,43 @@ namespace AspNetCoreFirstApp
                 app.MapGet("/send_email",
                     async (
                         IEmailSender emailSender,
-                        IConfiguration configuration,
                         CancellationToken token,
-                        IOptionsSnapshot<SmtpConfig> options) =>
+                        IConfiguration config,
+                        ILogger<Program> logger) =>
                         {
-                            try
+                            var retryCount = 1;
+                            while (retryCount < 4)
                             {
-                                var retryCount = 3;
-                                await emailSender.SendEmailAsync(
-                                "Aleksey S.",
-                                "asp2022pd011@rodion-m.ru",
-                                "Alex", "kokotiv3@ya.ru",
-                                "Memory",
-                                options.Value.EmailText,
-                                retryCount,
-                                token);
-                                return "Сообщение отправлено";
+                                try
+                                {
+                                    logger.LogInformation("Sending... Try: {@try}", retryCount);
+                                    await emailSender.SendEmailAsync(
+                                       "Aleksey S.",
+                                       config.GetSection("SmtpConfig").GetValue<string>("Login")
+                                           ?? throw new ArgumentNullException(nameof(config)),
+                                       "Alex",
+                                       "kokotiv3@ya.ru",
+                                       "Memory",
+                                       config.GetSection("SmtpConfig").GetValue<string>("EmailText")
+                                           ?? throw new ArgumentNullException(nameof(config)),
+                                       token);
+                                    logger.LogInformation("Message delivered");
+                                    return "Сообщение отправлено";
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.LogWarning("Caugth an error: {@ex}", ex);
+                                    await Task.Delay(TimeSpan.FromSeconds(5));
+                                }
+                                finally
+                                {
+                                    retryCount++;
+                                }
                             }
-                            catch (Exception)
-                            {
-                                return "Сообщение не отправлено";
-                            }
+                            logger.LogError(
+                                "Error with IEmailSender: message not delivered {@sender}",
+                                emailSender);
+                            return "Сообщение не отправлено";
                         });
                 app.Run();
             }
