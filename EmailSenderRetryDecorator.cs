@@ -12,7 +12,7 @@ namespace AspNetCoreFirstApp
         private readonly ILogger<EmailSenderRetryDecorator> _logger;
         private readonly IOptionsSnapshot<SmtpConfig> _options;
         private readonly AsyncRetryPolicy _policy;
-        private TimeSpan _timeout;
+        private readonly TimeSpan _timeout;
         public EmailSenderRetryDecorator(
             IEmailSender inner,
             ILogger<EmailSenderRetryDecorator> logger,
@@ -20,15 +20,14 @@ namespace AspNetCoreFirstApp
         {
             _options = options;
             _timeout = TimeSpan.FromMilliseconds(_options.Value.WaitForNextTry);
-
             _inner = inner;
             _logger = logger;
             _policy = Policy
                 .Handle<ConnectionException>()
-                .WaitAndRetryAsync(_options.Value.RetryCount, t=> _timeout,
-                           (ex,timespan, retryAttempt, context) =>
+                .WaitAndRetryAsync(_options.Value.RetryCount, t => _timeout,
+                           (ex, timespan, retryAttempt, context) =>
                            {
-                               _logger.LogWarning(ex,"Caught an error. Retrying: {attempt}", retryAttempt);
+                               _logger.LogWarning(ex, "Caught an error. Retrying: {attempt}", retryAttempt);
                            });
         }
 
