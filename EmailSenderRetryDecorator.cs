@@ -1,32 +1,38 @@
-﻿using Polly;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Polly;
 using Polly.Retry;
+using System.Threading;
 
 namespace AspNetCoreFirstApp
 {
-
-
     public class EmailSenderRetryDecorator : IEmailSender
     {
         private readonly IEmailSender _inner;
         private readonly ILogger<EmailSenderRetryDecorator> _logger;
-        private readonly IConfiguration _configuration;
+        private readonly IOptionsSnapshot<SmtpConfig> _options;
         private readonly AsyncRetryPolicy _policy;
+        private TimeSpan _timeout;
         public EmailSenderRetryDecorator(
             IEmailSender inner,
             ILogger<EmailSenderRetryDecorator> logger,
-            IConfiguration configuration)
+            IOptionsSnapshot<SmtpConfig> options)
         {
-            _configuration = configuration;
+            _options = options;
+            _timeout = TimeSpan.FromMilliseconds(_options.Value.WaitForNextTry);
+
             _inner = inner;
             _logger = logger;
+            _logger.LogInformation("Retry count {@count}", _options.Value.RetryCount);
             _policy = Policy
                 .Handle<ConnectionException>()
-                .RetryAsync(_configuration
-                                .GetSection("SmtpConfig")
-                                .GetValue<int>("MaxRetryCount"),
-                           (ex, retryAttempt) =>
-                                _logger.LogWarning(ex, "Caught an error. Retrying: {attempt}", retryAttempt));
+                .WaitAndRetryAsync(_options.Value.RetryCount, t=> _timeout,
+                           (ex,timespan, retryAttempt, context) =>
+                           {
+                               _logger.LogWarning(ex,"Caught an error. Retrying: {attempt}", retryAttempt);
+                           });
         }
+
         public async Task SendEmailAsync(
             string fromName,
             string fromEmail,
@@ -40,7 +46,10 @@ namespace AspNetCoreFirstApp
                 .ExecuteAndCaptureAsync(() => _inner.SendEmailAsync(
                                             fromName, fromEmail, toName, toEmail, subject, body, token));
             if (result.Outcome == OutcomeType.Failure)
+            {
+                _logger.LogError(result.FinalException, "There was an error while sending email");
                 throw result.FinalException;
+            }
         }
     }
 }

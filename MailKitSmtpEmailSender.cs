@@ -1,16 +1,17 @@
-﻿using MimeKit;
+﻿using Microsoft.Extensions.Options;
+using MimeKit;
 
 namespace AspNetCoreFirstApp
 {
     public class MailKitSmtpEmailSender : IEmailSender, IAsyncDisposable, IDisposable
     {
         private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
-        private readonly IConfiguration _config;
+        private readonly IOptionsSnapshot<SmtpConfig> _config;
         private readonly MailKit.Net.Smtp.SmtpClient _smtpClient;
         private readonly ILogger<MailKitSmtpEmailSender> _logger;
         private bool disposed;
         public MailKitSmtpEmailSender(
-            IConfiguration config,
+            IOptionsSnapshot<SmtpConfig> config,
             ILogger<MailKitSmtpEmailSender> logger)
         {
             _config = config;
@@ -60,25 +61,18 @@ namespace AspNetCoreFirstApp
             string body,
             CancellationToken token)
         {
-            try
+            await EnsureConnectedAndAuthenticated(token);
+            var mimeMessage = new MimeMessage();
+            mimeMessage.From.Add(new MailboxAddress(fromName, fromEmail));
+            mimeMessage.To.Add(new MailboxAddress(toName, toEmail));
+            mimeMessage.Subject = subject;
+            mimeMessage.Body = new TextPart(MimeKit.Text.TextFormat.Plain)
             {
-                await EnsureConnectedAndAuthenticated(token);
-                var mimeMessage = new MimeMessage();
-                mimeMessage.From.Add(new MailboxAddress(fromName, fromEmail));
-                mimeMessage.To.Add(new MailboxAddress(toName, toEmail));
-                mimeMessage.Subject = subject;
-                mimeMessage.Body = new TextPart(MimeKit.Text.TextFormat.Plain)
-                {
-                    Text = body
-                };
-                var response = await _smtpClient.SendAsync(mimeMessage, token);
-                _logger.LogInformation("Smtp server response: {@response}", response);
-                _logger.LogInformation("Message sent to {@To}", mimeMessage.To.First().Name);
-            }
-            catch (Exception)
-            {
-                throw;
-            }
+                Text = body
+            };
+            var response = await _smtpClient.SendAsync(mimeMessage, token);
+            _logger.LogInformation("Smtp server response: {@response}", response);
+            _logger.LogInformation("Message sent to {@To}", mimeMessage.To.First().Name);
 
         }
 
@@ -90,17 +84,17 @@ namespace AspNetCoreFirstApp
                 if (!_smtpClient.IsConnected)
                 {
                     await _smtpClient.ConnectAsync(
-                        _config.GetSection("SmtpConfig").GetValue<string>("Host"),
-                        _config.GetSection("SmtpConfig").GetValue<int>("Port"),
-                        _config.GetSection("SmtpConfig").GetValue<bool>("UseSsl"),
+                        _config.Value.Host,
+                        _config.Value.Port,
+                        _config.Value.UseSsl,
                         cancellationToken: token);
                     _logger.LogInformation("_smtpClient connected");
                 }
                 if (!_smtpClient.IsAuthenticated)
                 {
                     await _smtpClient.AuthenticateAsync(
-                        _config.GetSection("SmtpConfig").GetValue<string>("Login"),
-                        _config.GetSection("SmtpConfig").GetValue<string>("Password"),
+                        _config.Value.Login,
+                        _config.Value.Password,
                         cancellationToken: token);
                     _logger.LogInformation("_smtpClient authenticated");
                 }
