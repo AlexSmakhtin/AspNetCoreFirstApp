@@ -23,7 +23,6 @@ namespace AspNetCoreFirstApp
 
             _inner = inner;
             _logger = logger;
-            _logger.LogInformation("Retry count {@count}", _options.Value.RetryCount);
             _policy = Policy
                 .Handle<ConnectionException>()
                 .WaitAndRetryAsync(_options.Value.RetryCount, t=> _timeout,
