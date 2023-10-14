@@ -24,7 +24,7 @@ namespace AspNetCoreFirstApp
             _logger = logger;
             _policy = Policy
                 .Handle<ConnectionException>()
-                .WaitAndRetryAsync(_options.Value.RetryCount, t => _timeout,
+                .WaitAndRetryAsync(_options.Value.RetryCount, t => _timeout * t,
                            (ex, timespan, retryAttempt, context) =>
                            {
                                _logger.LogWarning(ex, "Caught an error. Retrying: {attempt}", retryAttempt);
